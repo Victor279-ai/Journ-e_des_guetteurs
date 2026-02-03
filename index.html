@@ -25,16 +25,14 @@ body {
     border-radius: 12px;
 }
 
-/* ✅ Cercle vidéo placé sur l’assemblée */
+/* Cercle vidéo */
 #videoCircle {
     position: absolute;
     top: 43%;
     left: 33%;
     transform: translate(-50%, -50%);
-
     width: 210px;
     height: 210px;
-
     border-radius: 50%;
     overflow: hidden;
     background: black;
@@ -47,7 +45,6 @@ body {
     object-fit: cover;
 }
 
-/* Boutons */
 button {
     margin-top: 15px;
     padding: 12px 20px;
@@ -74,76 +71,80 @@ button {
 
 <h3>🎥 Témoignage – Journée des Guetteurs</h3>
 
-<div class="container" id="captureZone">
+<div class="container">
     <img src="affiche.png" id="affiche">
 
     <div id="videoCircle">
-        <video id="videoPlayback" autoplay muted loop></video>
+        <!-- Vidéo en direct -->
+        <video id="videoLive" autoplay muted></video>
     </div>
 </div>
 
-<button id="recordBtn">🎥 Cliquer pour faire la vidéo (15s)</button>
-<button id="downloadBtn">📥 Télécharger mon affiche vidéo</button>
+<button id="recordBtn">🎥 Enregistrer mon témoignage (15s)</button>
+<button id="downloadBtn">📥 Télécharger ma vidéo</button>
 
 <script>
 let mediaRecorder;
 let recordedChunks = [];
-const videoCircle = document.getElementById("videoCircle");
-const videoPlayback = document.getElementById("videoPlayback");
+let recordedBlob;
 
-document.getElementById("recordBtn").onclick = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+const videoCircle = document.getElementById("videoCircle");
+const videoLive = document.getElementById("videoLive");
+const recordBtn = document.getElementById("recordBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+
+recordBtn.onclick = async () => {
+
+    // 🎥 Caméra en direct
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+    });
+
+    // Afficher directement la caméra dans le cercle
+    videoLive.srcObject = stream;
+    videoCircle.style.display = "block";
+
+    // 🎬 Enregistrement
     mediaRecorder = new MediaRecorder(stream);
     recordedChunks = [];
 
-    mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+    mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+    };
 
     mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: "video/webm" });
-        videoPlayback.src = URL.createObjectURL(blob);
-        videoCircle.style.display = "block";
-        document.getElementById("downloadBtn").style.display = "inline-block";
+
+        // Créer le fichier vidéo final
+        recordedBlob = new Blob(recordedChunks, {
+            type: "video/webm"
+        });
+
+        // Stop caméra
+        stream.getTracks().forEach(track => track.stop());
+
+        // Activer bouton téléchargement
+        downloadBtn.style.display = "inline-block";
+        recordBtn.innerText = "✅ Vidéo enregistrée !";
     };
 
     mediaRecorder.start();
-    setTimeout(() => mediaRecorder.stop(), 15000);
+
+    // Stop après 15 secondes
+    setTimeout(() => {
+        mediaRecorder.stop();
+    }, 15000);
 };
 
-document.getElementById("downloadBtn").onclick = async () => {
-    const canvas = document.createElement("canvas");
-    const container = document.getElementById("captureZone");
-    canvas.width = container.offsetWidth;
-    canvas.height = container.offsetHeight;
 
-    const ctx = canvas.getContext("2d");
-    const img = document.getElementById("affiche");
+// 📥 Télécharger la vidéo directement
+downloadBtn.onclick = () => {
 
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const video = videoPlayback;
-
-    /* ✅ Cercle exactement sur l'assemblée */
-    const circleX = canvas.width * 0.33;
-    const circleY = canvas.height * 0.43;
-    const radius = 105;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(circleX, circleY, radius, 0, Math.PI * 2);
-    ctx.clip();
-
-    ctx.drawImage(video,
-        circleX - radius,
-        circleY - radius,
-        radius * 2,
-        radius * 2
-    );
-
-    ctx.restore();
+    const url = URL.createObjectURL(recordedBlob);
 
     const link = document.createElement("a");
-    link.download = "affiche-video-guetteurs.png";
-    link.href = canvas.toDataURL("image/png");
+    link.href = url;
+    link.download = "temoignage-guetteurs.webm";
     link.click();
 };
 </script>
